@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Circle to Profile Picture with Custom Text on Arc</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 50px;
+        }
+        canvas {
+            border: 2px solid black;
+        }
+        #downloadBtn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        #downloadBtn:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>Add Custom Text Circle to Profile Picture</h1>
+
+    <input type="file" id="upload" accept="image/png"><br><br>
+
+    <label for="customText">Enter Custom Text: </label>
+    <input type="text" id="customText" value="#homeless"><br><br>
+
+    <canvas id="canvas" width="400" height="400"></canvas>
+    <br>
+    <button id="downloadBtn" style="display:none;">Download Image</button>
+
+    <script>
+        const uploadInput = document.getElementById('upload');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const customTextInput = document.getElementById('customText');
+        const canvasSize = 400;  // Set the canvas size
+
+        uploadInput.addEventListener('change', handleUpload);
+
+        function handleUpload(event) {
+            const file = event.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const img = new Image();
+                const reader = new FileReader();
+
+                reader.onload = function (e) {
+                    img.src = e.target.result;
+                };
+
+                img.onload = function () {
+                    // Clear the canvas
+                    ctx.clearRect(0, 0, canvasSize, canvasSize);
+
+                    // Draw the uploaded image on the canvas
+                    const scale = Math.min(canvasSize / img.width, canvasSize / img.height);
+                    const x = (canvasSize / 2) - (img.width / 2) * scale;
+                    const y = (canvasSize / 2) - (img.height / 2) * scale;
+                    const imgWidth = img.width * scale;
+                    const imgHeight = img.height * scale;
+                    ctx.drawImage(img, x, y, imgWidth, imgHeight);
+
+                    // Define arc properties: shift arc 90 degrees
+                    const startAngle = (3 * Math.PI) / 4 - Math.PI / 2;
+                    const endAngle = (7 * Math.PI) / 4 - Math.PI / 2;
+                    const radius = canvasSize / 2 - 80;
+                    const arcThickness = 40;
+
+                    // Create a gradient at the beginning and end of the arc
+                    const gradient = ctx.createLinearGradient(0, 0, canvasSize, canvasSize);
+                    gradient.addColorStop(0, 'rgba(255, 0, 0, 0)');  // Red at the start of the arc
+                    gradient.addColorStop(0.5, 'rgba(255, 0, 0, 1)');  // Transparent in the middle
+                    gradient.addColorStop(1, 'rgba(255, 0, 0, 0)');  // Red at the end of the arc
+
+                    // Draw the arc with the gradient
+                    ctx.strokeStyle = gradient;
+                    ctx.lineWidth = arcThickness;
+                    ctx.beginPath();
+                    ctx.arc(canvasSize / 2, canvasSize / 2, radius, startAngle, endAngle);
+                    ctx.stroke();
+
+                    // Get custom text from input
+                    const customText = customTextInput.value;
+
+                    // Add custom text along the arc (make the text readable and reversed)
+
+                    const startAnglet = startAngle + Math.PI/4;
+                    const endAnglet = endAngle - Math.PI/4;
+                    drawTextAlongArc(ctx, customText, canvasSize / 2, canvasSize / 2, radius + arcThickness / 3, startAnglet, endAnglet);
+
+                    // Show download button
+                    downloadBtn.style.display = 'block';
+                };
+
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Function to draw text along the arc with arc shape
+        function drawTextAlongArc(context, text, centerX, centerY, radius, startAngle, endAngle) {
+            context.font = 'bold 24px Arial';
+            context.fillStyle = 'white';
+
+            // Calculate total angle for the text
+            const totalAngle = endAngle - startAngle;
+            const charSpacing = totalAngle / text.length;  // Equal spacing for each character
+
+            text = text.split('').reverse().join('');
+            // Loop through each character in reverse order and place it along the arc
+            for (let i = 0 ; i < text.length; ++i) {
+                const char = text[i];
+                const angle = startAngle + (i + 0.5) * charSpacing;  // Place each character at its position
+
+                // Save the current context and rotate for each character (rotate 270° relative to the arc direction to make it readable)
+                context.save();
+                context.translate(centerX + Math.cos(angle) * radius, centerY + Math.sin(angle) * radius);
+                context.rotate(angle + (3 * Math.PI) / 2);  // Rotate the character by 270 degrees
+                context.fillText(char, -context.measureText(char).width / 2, 0);  // Draw the character centered
+                context.restore();
+            }
+        }
+
+        // Download the image when the download button is clicked
+        downloadBtn.addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'profile_picture_with_arc.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        });
+    </script>
+</body>
+</html>
