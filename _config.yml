@@ -2,7 +2,7 @@ excerpt_separator: ""
 pygments: true
 markdown: kramdown
 url: http://suitzero.github.io
-title: CHOI NOBI
-tagline: A log of everyday life
-description: My awesome new site
+title: Hagyoon Choi - Software Engineer
+tagline: Experienced Software Engineer | Game Development | Platform Engineering
+description: Personal homepage of Hagyoon Choi, showcasing projects, publications, and resume.
 paginate: 5
