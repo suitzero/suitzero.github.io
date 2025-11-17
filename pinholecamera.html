@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pinhole Camera Shader Simulation</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+        #ui-layer {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: monospace;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            pointer-events: none;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        #coords {
+            color: #8af;
+            white-space: pre-line;
+            font-weight: bold;
+            border-top: 1px solid #555;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui-layer">
+        <div>
+            <b>Pinhole Camera Simulation</b><br/>
+            <b>WASD</b> + <b>Q/E</b> to Move<br/>
+            <b>Left Click & Drag</b> to Look<br/>
+            <b>Right Click</b> to animate inside box.<br/>
+        </div>
+        <div id="coords">Initializing...</div>
+    </div>
+    <canvas id="glcanvas"></canvas>
+
+    <script>
+        // --- CONFIGURATION: SET INITIAL POSITION HERE ---
+        const INITIAL_CAM_POS = { x: -7.35, y: 0.0, z: -0.13 };
+        const INITIAL_YAW = 1.26;
+        const INITIAL_PITCH = -0.05;
+        // ------------------------------------------------
+
+        const canvas = document.getElementById('glcanvas');
+        const gl = canvas.getContext('webgl2');
+        const coordsDiv = document.getElementById('coords');
+
+        // Prevent context menu on right click
+        canvas.addEventListener('contextmenu', event => event.preventDefault());
+
+        if (!gl) {
+            document.body.innerHTML = "WebGL2 is not supported by your browser.";
+        }
+
+        // Resize canvas to full screen
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Vertex Shader (Standard Full Screen Quad)
+        const vsSource = `#version 300 es
+        in vec4 position;
+        void main() {
+            gl_Position = position;
+        }`;
+
+        // Fragment Shader (The Shadertoy Code)
+        const fsSource = `#version 300 es
+        precision highp float;
+
+        uniform vec2 iResolution;
+        uniform float iTime;
+        uniform vec4 iMouse;
+        uniform vec3 iCameraPos; // New uniform for manual camera position
+        uniform vec2 iCameraAngle; // New uniform for persistent rotation (x=yaw, y=pitch)
+
+        out vec4 fragColor;
+
+        // --- SCENE CONSTANTS ---
+        #define MAX_STEPS 100
+        #define MAX_DIST 50.0
+        #define SURF_DIST 0.001
+        
+        // Material IDs
+        #define MAT_FLOOR 1.0
+        #define MAT_OUTSIDE_OBJ 2.0
+        #define MAT_BOX_OUTSIDE 3.0
+        #define MAT_BOX_INSIDE 4.0
+        #define MAT_SCREEN 5.0
+
+        // Box dimensions
+        vec3 boxSize = vec3(2.0, 1.5, 2.0);
+        float wallThickness = 0.1;
+        vec3 pinholePos = vec3(0.0, 0.0, 2.0); // Pinhole is on the Z+ face
+        float pinholeRadius = 0.08;
+
+        // --- SDF PRIMITIVES ---
+        
+        float sdBox(vec3 p, vec3 b) {
+            vec3 q = abs(p) - b;
+            return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+        }
+
+        float sdSphere(vec3 p, float s) {
+            return length(p) - s;
+        }
+
+        // Standard rotation matrix
+        mat2 rot(float a) {
+            float s = sin(a);
+            float c = cos(a);
+            return mat2(c, -s, s, c);
+        }
+
+        // --- SCENE MAPPING ---
+
+        vec2 map(vec3 p) {
+            // 1. The Room / Floor (Outside world)
+            float dFloor = p.y + 2.0;
+            
+            // 2. Floating Objects (The subject of the photo)
+            // A spinning cube and sphere outside the box
+            vec3 objPos = p - vec3(0.0, 0.0, 6.0); 
+            objPos.xz *= rot(iTime);
+            objPos.xy *= rot(iTime * 0.5);
+            float dObjects = sdBox(objPos, vec3(0.7));
+            
+            vec3 spherePos = p - vec3(2.5 * sin(iTime), 0.0, 5.0 + 2.5 * cos(iTime));
+            float dSphere = sdSphere(spherePos, 0.5);
+            
+            dObjects = min(dObjects, dSphere);
+
+            // 3. The Pinhole Camera Box
+            // Outer shell
+            float dBoxOuter = sdBox(p, boxSize);
+            // Inner hollow (slightly smaller)
+            float dBoxInner = sdBox(p, boxSize - vec3(wallThickness));
+            
+            // The Pinhole (Cylinder cutout on Z axis)
+            vec3 holeP = p - pinholePos;
+            float dHole = length(holeP.xy) - pinholeRadius;
+            // Constrain hole to front face depth
+            float holeDepth = abs(holeP.z) - wallThickness * 2.0; 
+            dHole = max(dHole, holeDepth);
+
+            // Create the hollow box with a hole
+            float dCameraBox = max(dBoxOuter, -dBoxInner);
+            dCameraBox = max(dCameraBox, -dHole);
+
+            // --- IDENTIFY MATERIALS ---
+            
+            // Default generic result
+            vec2 res = vec2(dFloor, MAT_FLOOR);
+
+            // Check objects
+            if (dObjects < res.x) res = vec2(dObjects, MAT_OUTSIDE_OBJ);
+            
+            // Check Camera Box
+            if (dCameraBox < res.x) {
+                res.x = dCameraBox;
+                
+                // Determine specific part of the box
+                // If we are essentially inside the box bounds but hitting geometry:
+                bool isInsideBounds = sdBox(p, boxSize - vec3(wallThickness * 0.5)) < 0.0;
+                
+                if (isInsideBounds) {
+                    // Check if it's the back wall (The Screen)
+                    // The back wall is at z = -(boxSize.z - wallThickness)
+                    float distToBackWall = abs(p.z - (-boxSize.z + wallThickness));
+                    
+                    if (distToBackWall < 0.2 && abs(p.x) < boxSize.x - 0.2 && abs(p.y) < boxSize.y - 0.2) {
+                        res.y = MAT_SCREEN;
+                    } else {
+                        res.y = MAT_BOX_INSIDE;
+                    }
+                } else {
+                    res.y = MAT_BOX_OUTSIDE;
+                }
+            }
+
+            return res;
+        }
+
+        // --- RAYMARCHING ---
+
+        vec2 rayMarch(vec3 ro, vec3 rd) {
+            float dO = 0.0;
+            float m = 0.0;
+            
+            for(int i = 0; i < MAX_STEPS; i++) {
+                vec3 p = ro + rd * dO;
+                vec2 dS = map(p);
+                dO += dS.x;
+                m = dS.y;
+                if(dO > MAX_DIST || abs(dS.x) < SURF_DIST) break;
+            }
+            
+            return vec2(dO, m);
+        }
+
+        // --- NORMALS ---
+
+        vec3 getNormal(vec3 p) {
+            float d = map(p).x;
+            vec2 e = vec2(0.001, 0.0);
+            vec3 n = d - vec3(
+                map(p-e.xyy).x,
+                map(p-e.yxy).x,
+                map(p-e.yyx).x);
+            return normalize(n);
+        }
+
+        // --- LIGHTING & MATERIALS ---
+
+        vec3 getMaterialColor(vec3 p, float matID, vec3 n, vec3 rd) {
+            vec3 col = vec3(0.0);
+            
+            // Lighting setup
+            vec3 lightPos = vec3(5.0, 10.0, 5.0);
+            vec3 l = normalize(lightPos - p);
+            float dif = clamp(dot(n, l), 0.0, 1.0);
+            float amb = 0.1; // Ambient light
+
+            if (matID == MAT_FLOOR) {
+                // Checkerboard pattern
+                float check = mod(floor(p.x) + floor(p.z), 2.0);
+                col = vec3(0.2 + 0.3 * check);
+                col *= (dif + amb);
+            } 
+            else if (matID == MAT_OUTSIDE_OBJ) {
+                // Colorful shapes
+                col = vec3(1.0, 0.5, 0.2); 
+                // Add some noise/gradient based on position
+                col += 0.5 * sin(p * 2.0);
+                col *= (dif + amb);
+            } 
+            else if (matID == MAT_BOX_OUTSIDE) {
+                col = vec3(0.8, 0.8, 0.8); // White box
+                col *= (dif + amb);
+            } 
+            else if (matID == MAT_BOX_INSIDE) {
+                col = vec3(0.05); // Very dark grey inside
+            }
+            else if (matID == MAT_SCREEN) {
+                // This is the placeholder screen color if logic fails
+                // But the main logic handles this specially
+                col = vec3(0.1);
+            }
+
+            // Distance fog
+            float d = length(p - vec3(0.0, 0.0, -5.0)); // Fog from camera start roughly
+            col = mix(col, vec3(0.0), 1.0 - exp(-0.02 * d * d));
+            
+            return col;
+        }
+
+        void main() {
+            vec2 uv = (gl_FragCoord.xy - 0.5 * iResolution.xy) / iResolution.y;
+            
+            // --- CAMERA SETUP ---
+            // Use uniform position from JS
+            vec3 ro = iCameraPos;
+            
+            // Use persistent angles from JS
+            float yaw = iCameraAngle.x;
+            float pitch = iCameraAngle.y;
+            
+            vec3 forward = normalize(vec3(sin(yaw), pitch, cos(yaw)));
+            vec3 right = normalize(cross(vec3(0,1,0), forward));
+            vec3 up = cross(forward, right);
+            
+            vec3 rd = normalize(forward + right * uv.x + up * uv.y);
+
+            // --- FIRST PASS RAYMARCH ---
+            vec2 hit = rayMarch(ro, rd);
+            float d = hit.x;
+            float mat = hit.y;
+            
+            vec3 col = vec3(0.0);
+
+            if (d < MAX_DIST) {
+                vec3 p = ro + rd * d;
+                vec3 n = getNormal(p);
+                
+                // --- PINHOLE SIMULATION LOGIC ---
+                if (mat == MAT_SCREEN) {
+                    // We hit the back wall inside the box.
+                    // 1. Calculate vector from Hit Point (Screen) to Pinhole
+                    // Pinhole is at pinholePos
+                    vec3 dirToHole = normalize(pinholePos - p);
+                    
+                    // 2. Check alignment (Are we actually looking towards the hole?)
+                    // Dot product of Normal and DirToHole should be positive
+                    if (dot(n, dirToHole) > 0.0) {
+                        
+                        // 3. Start a NEW ray trace from the pinhole outwards
+                        // We offset start slightly to exit the box geometry
+                        vec3 secondaryRo = pinholePos + dirToHole * 0.5; 
+                        vec3 secondaryRd = dirToHole;
+                        
+                        vec2 secondaryHit = rayMarch(secondaryRo, secondaryRd);
+                        
+                        if (secondaryHit.x < MAX_DIST) {
+                            vec3 p2 = secondaryRo + secondaryRd * secondaryHit.x;
+                            vec3 n2 = getNormal(p2);
+                            
+                            // Get the color of the outside world
+                            vec3 projectedColor = getMaterialColor(p2, secondaryHit.y, n2, secondaryRd);
+                            
+                            // Add screen diffusion/grain
+                            col = projectedColor;
+                            
+                            // Vignette/Falloff based on angle (cosine law)
+                            float angle = dot(vec3(0,0,1), dirToHole);
+                            col *= pow(abs(angle), 4.0); // Darken edges
+                            
+                            // Add texture to screen itself (paper grain)
+                            col += (fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453) * 0.05);
+                        } else {
+                            // Sky color
+                            col = vec3(0.0); 
+                        }
+                    } else {
+                        col = vec3(0.05); // Looking at screen from weird angle
+                    }
+                } 
+                else {
+                    // Standard Rendering
+                    col = getMaterialColor(p, mat, n, rd);
+                }
+            }
+
+            // Gamma correction
+            col = pow(col, vec3(1.0/2.2));
+            
+            fragColor = vec4(col, 1.0);
+        }`;
+
+        // Boilerplate WebGL setup
+        function createShader(gl, type, source) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error(gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+            return shader;
+        }
+
+        const vs = createShader(gl, gl.VERTEX_SHADER, vsSource);
+        const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
+        const program = gl.createProgram();
+        gl.attachShader(program, vs);
+        gl.attachShader(program, fs);
+        gl.linkProgram(program);
+
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            console.error(gl.getProgramInfoLog(program));
+        }
+
+        const positionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+            -1, -1,  1, -1, -1,  1,
+            -1,  1,  1, -1,  1,  1,
+        ]), gl.STATIC_DRAW);
+
+        const positionLoc = gl.getAttribLocation(program, 'position');
+        gl.enableVertexAttribArray(positionLoc);
+        gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
+
+        gl.useProgram(program);
+
+        const resLoc = gl.getUniformLocation(program, 'iResolution');
+        const timeLoc = gl.getUniformLocation(program, 'iTime');
+        const mouseLoc = gl.getUniformLocation(program, 'iMouse');
+        const camPosLoc = gl.getUniformLocation(program, 'iCameraPos');
+        const camAngleLoc = gl.getUniformLocation(program, 'iCameraAngle');
+
+        // Camera State (Initialized from constants)
+        let camPos = { ...INITIAL_CAM_POS };
+        let camYaw = INITIAL_YAW;
+        let camPitch = INITIAL_PITCH;
+
+        // Animation State
+        let isAnimating = false;
+        let animStartTime = 0;
+        let animStartPos = {x:0, y:0, z:0};
+        let animStartYaw = 0;
+        let animStartPitch = 0;
+
+        // Mouse state (Persistent Drag)
+        canvas.addEventListener('mousedown', e => {
+            // Right click triggers animation
+            if (e.button === 2) {
+                isAnimating = true;
+                animStartTime = performance.now();
+                animStartPos = { ...camPos };
+                animStartYaw = camYaw;
+                animStartPitch = camPitch;
+                return; // Skip drag logic for right click
+            }
+        });
+
+        canvas.addEventListener('mousemove', e => {
+            if (isAnimating) return; // Disable control during animation
+
+            if(e.buttons === 1) {
+                // Adjust sensitivity as needed
+                camYaw += e.movementX * 0.005;
+                camPitch -= e.movementY * 0.005;
+                
+                // Clamp pitch to prevent neck breaking
+                camPitch = Math.max(-1.5, Math.min(1.5, camPitch));
+            }
+        });
+
+        // Keyboard state
+        const keys = {};
+        window.addEventListener('keydown', (e) => { keys[e.key.toLowerCase()] = true; });
+        window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+
+        function lerp(start, end, t) {
+            return start * (1 - t) + end * t;
+        }
+
+        function render(time) {
+            const now = performance.now(); // High res time for JS animation logic
+            time *= 0.001; // convert to seconds for shader
+
+            if (isAnimating) {
+                // Animation Sequence Logic
+                const t = (now - animStartTime) / 1000.0; // Time in seconds since start
+
+                // Phase 1: Move to center of box (0-2 seconds)
+                if (t < 2.0) {
+                    const prog = Math.min(t / 2.0, 1.0);
+                    // Smooth step
+                    const smooth = prog * prog * (3 - 2 * prog);
+                    
+                    camPos.x = lerp(animStartPos.x, 0.0, smooth);
+                    camPos.y = lerp(animStartPos.y, 0.0, smooth);
+                    camPos.z = lerp(animStartPos.z, 0.0, smooth);
+                    
+                    camYaw = lerp(animStartYaw, 0.0, smooth); // Look at Pinhole (Yaw 0)
+                    camPitch = lerp(animStartPitch, 0.0, smooth);
+                }
+                // Phase 2: Pause to look at pinhole (2-3 seconds)
+                else if (t < 3.0) {
+                    camYaw = 0.0;
+                    camPitch = 0.0;
+                    camPos.x = 0; camPos.y = 0; camPos.z = 0;
+                }
+                // Phase 3: Turn around to look at screen (3-5 seconds)
+                else if (t < 5.0) {
+                    const prog = Math.min((t - 3.0) / 2.0, 1.0);
+                    const smooth = prog * prog * (3 - 2 * prog);
+                    
+                    camYaw = lerp(0.0, Math.PI, smooth); // Rotate 180 degrees
+                }
+                // Phase 4: Done, stay looking at screen
+                else {
+                    camYaw = Math.PI;
+                    // Optional: Disable animation to regain control
+                    // isAnimating = false; 
+                }
+                
+                coordsDiv.innerText = "ANIMATION SEQUENCE ACTIVE\nRight click to restart.";
+            } 
+            else {
+                // Manual Movement Logic
+                const speed = 0.1;
+                const forwardX = Math.sin(camYaw);
+                const forwardZ = Math.cos(camYaw);
+                const rightX = Math.cos(camYaw); 
+                const rightZ = -Math.sin(camYaw);
+
+                if (keys['w']) {
+                    camPos.x += forwardX * speed;
+                    camPos.z += forwardZ * speed;
+                }
+                if (keys['s']) {
+                    camPos.x -= forwardX * speed;
+                    camPos.z -= forwardZ * speed;
+                }
+                if (keys['d']) {
+                    camPos.x += rightX * speed;
+                    camPos.z += rightZ * speed;
+                }
+                if (keys['a']) {
+                    camPos.x -= rightX * speed;
+                    camPos.z -= rightZ * speed;
+                }
+                
+                if (keys['e']) camPos.y += speed;
+                if (keys['q']) camPos.y -= speed;
+
+                // Update UI
+                coordsDiv.innerText = `POS:  X: ${camPos.x.toFixed(2)}  Y: ${camPos.y.toFixed(2)}  Z: ${camPos.z.toFixed(2)}\nROT:  Yaw: ${camYaw.toFixed(2)}  Pitch: ${camPitch.toFixed(2)}`;
+            }
+
+            gl.uniform2f(resLoc, canvas.width, canvas.height);
+            gl.uniform1f(timeLoc, time);
+            gl.uniform4f(mouseLoc, 0, 0, 0, 0);
+            gl.uniform3f(camPosLoc, camPos.x, camPos.y, camPos.z);
+            gl.uniform2f(camAngleLoc, camYaw, camPitch);
+
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            requestAnimationFrame(render);
+        }
+        requestAnimationFrame(render);
+
+    </script>
+</body>
+</html>
