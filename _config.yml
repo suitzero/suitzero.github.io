@@ -1,8 +1,8 @@
 excerpt_separator: ""
 pygments: true
 markdown: kramdown
-url: http://suitzero.github.io
+url: https://suitzero.github.io
 title: Hagyoon Choi - Software Engineer
-tagline: Experienced Software Engineer | Game Development | Platform Engineering
-description: Personal homepage of Hagyoon Choi, showcasing projects, publications, and resume.
+tagline: Anytime computing | Optical computing | World models
+description: Personal homepage of Hagyoon Choi — software engineer researching anytime computing and optical computing for the world-model AI era.
 paginate: 5
