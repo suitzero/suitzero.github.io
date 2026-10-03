@@ -1,61 +1,106 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
     <head>
-        <title>Hagyoon Choi - Software Engineer</title>
-    <!-- https://enkimute.github.io/style.css" -->
-    <link rel="stylesheet" href="style.css"/>
+        <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1"/>
+        <title>Hagyoon Choi — Software Engineer</title>
+        <meta name="description" content="Hagyoon Choi — software engineer. Researching anytime computing and optical computing for the world-model AI era."/>
+        <link rel="stylesheet" href="style.css"/>
     </head>
     <body>
         <nav>
             <ul>
                 <li><a href="#">Home</a></li>
+                <li><a href="#research">Research</a></li>
                 <li><a href="#projects">Projects</a></li>
-                <li><a href="#publications">Publications</a></li>
+                <li><a href="#interests">Interests</a></li>
                 <li><a href="/blog_index.html">Blog</a></li>
                 <li><a href="HAGYOON-resume.pdf" target="_blank">Resume</a></li>
             </ul>
         </nav>
 
         <header>
-            <h1>Hagyoon Choi - Software Engineer</h1>
+            <h1>Hagyoon Choi</h1>
             <p>
-                With over 15 years of experience in software development, primarily in game development and publishing, I bring a versatile skill set applicable to diverse challenges. My work includes platform engineering at Twitter, and prior to that, I served as a Senior Software Engineer at Blizzard Entertainment on an unannounced survival project. I am passionate about continuous learning, particularly in mathematics and physics, and enjoy applying this knowledge to create innovative solutions.
+                Software engineer with ~20 years across games, platforms, and infrastructure —
+                game engines and backends at Nexon and Crytek, platform engineering at Twitter,
+                Blizzard Entertainment. M.S. in Computer Science, Georgia Tech
+                (Computational Perception &amp; Robotics).
+            </p>
+            <p>
+                These days I'm working on a thesis I take seriously:
+                <em>optics + anytime computing will matter for the world-model AI era</em> —
+                and building the software stack to prove it, in the open.
+                I'm also currently exploring what's next, career-wise.
             </p>
         </header>
+
+        <section id="research">
+            <h2>Research</h2>
+            <ul>
+                <li>
+                    <h3>Anytime VM</h3>
+                    <p>
+                        A minimal compute model with exactly three primitives: <strong>VALUE</strong>,
+                        <strong>REFINE</strong>, <strong>COMPOSE</strong>. Computation is the act of
+                        reducing uncertainty — every program is
+                        <code>estimate → refine → refine → …</code>, and any nonzero resources
+                        always yield a result. The VM knows nothing about CPUs, GPUs, or networks;
+                        hardware (GPUs today, photonics tomorrow) implements the VM's contract,
+                        not the other way around.
+                    </p>
+                    <a href="https://github.com/suitzero/vm" target="_blank">View on GitHub</a>
+                </li>
+                <li>
+                    <h3>GFL — a budget-aware scene language</h3>
+                    <p>
+                        A small SDF scene language with an anytime renderer: drag a budget slider
+                        and watch the same scene refine from coarse to fine, with the
+                        error-vs-budget tradeoff measured rather than mystical. The first
+                        visual demo of the Anytime VM ideas — inverse program synthesis included.
+                    </p>
+                    <a href="https://github.com/suitzero/gfl" target="_blank">View on GitHub</a>
+                </li>
+            </ul>
+        </section>
 
         <section id="projects">
             <h2>Projects</h2>
             <ul>
                 <li>
-                    <h3>NeuroForge</h3>
-                    <p>NeuroForge is a high-performance compiler designed to optimize and map machine learning workloads onto DPU and NPU hardware. It translates complex neural operations into low-level instructions tailored for maximum efficiency, enabling fast, power-aware inference on edge and embedded systems. Whether you're building next-gen AR/VR, robotics, or intelligent networking applications, NeuroForge bridges the gap between high-level ML frameworks and specialized silicon.</p>
-                    <a href="https://github.com/suitzero/NeuroForge" target="_blank">View on GitHub</a>
+                    <h3>uhbilliards — optical logic gates as a game</h3>
+                    <p>
+                        A billiards puzzle game where each stage is a real optical logic gate
+                        (OR, XOR, NOT), verified by ray-tracing the full truth table every frame.
+                        Playable in the browser.
+                    </p>
+                    <a href="https://github.com/suitzero/uhbilliards" target="_blank">View on GitHub</a>
                 </li>
                 <li>
-                    <h3>Project Title 2 (Example)</h3>
-                    <p>Another interesting project I worked on.</p>
-                    <a href="#">Link to project</a>
+                    <h3>uh-fdtd — photonics simulation</h3>
+                    <p>
+                        Finite-difference time-domain playground for silicon photonics experiments.
+                    </p>
+                    <a href="https://github.com/suitzero/uh-fdtd" target="_blank">View on GitHub</a>
                 </li>
-                <!--
-                <embed type="text/html" src="hello.html" width="420" height="300" style="margin-left:10px">
-                <embed type="text/html" src="tickman.html" width="420" height="300" style="margin-left:10px">
-                -->
             </ul>
+            <p>
+                More on <a href="https://github.com/suitzero" target="_blank">GitHub</a> —
+                including uhlisp, uhkaraoke, uhcut, uhcraft, DimReduceNet, Swellmance,
+                and FluidSimulation. Most of it built in the open with AI coding agents.
+            </p>
         </section>
 
-        <section id="publications">
-            <h2>Publications & Articles</h2>
-            <ul>
-                <li><a href="/blog_index.html">Blog Posts</a></li>
-                <!-- Add links to other publications if any -->
-                <!-- Example:
-                <li>
-                    <h3>Paper Title</h3>
-                    <p>Brief description or abstract.</p>
-                    <a href="#">Link to paper</a>
-                </li>
-                -->
-            </ul>
+        <section id="interests">
+            <h2>Interests</h2>
+            <p>
+                Silicon photonics · optical computing · AI world models · anytime computing ·
+                perturbation theory · surreal numbers · lazy evaluation · distributed systems.
+            </p>
+            <p>
+                Off the keyboard: a decade of surfing, high-level MMA (jiu-jitsu/boxing base),
+                meditation and Buddhist philosophy, and the physics/math fundamentals underneath it all.
+            </p>
         </section>
 
         <section id="resume">
@@ -63,73 +108,33 @@
             <p><a href="HAGYOON-resume.pdf" target="_blank">View My Resume (PDF)</a></p>
         </section>
 
-        <!-- <h1>Hagyoon Choi</h1> -->
-        <!--
-	<div>
-		<span>
-			<img class="profile-img" src="img/hagyoon.png"/>
-			<p>
-			Following introduction is generated by chatGPT<br>
-			As a seasoned programmer with around 15 years of professional experience, I have a wealth of knowledge and skills in the field of software development. In fact, I began writing code long before I even learned trigonometry!<br>
-
-
-			Throughout my career, I have worked primarily in game development and publishing, where I have served as a generalist, working on a wide range of different problems and projects. More recently, I had the opportunity to work at Twitter as a software engineer, where I was responsible for working on a project that helped to provide the platform as a service.<br>
-
-
-			As a programmer, I have often felt that we live in the shadow of physicists and mathematicians. For this reason, I enjoy spending my free time learning math and physics, imagining that I may one day be able to make a significant contribution that encompassing all of these fields.<br>
-
-
-			In addition to my interest in programming and mathematics, I also have a passion for martial arts, meditation, and surfing. I believe that these activities help me to stay grounded and focused in my work, and I always strive to maintain a healthy balance between my professional and personal pursuits.<br>
-
-
-				<a href="https://github.com/suitzero/suitzero.github.io/raw/master/HAGYOON-resume.pdf">
-					resume
-				</a>
-			</p>
-		</span>
-	</div>
-	-->
-	<!--
-	<div>
-		<embed type="text/html" src="hello.html" width="420" height="300" style="margin-left:10px">
-			
-		<embed type="text/html" src="tickman.html" width="420" height="300" style="margin-left:10px">
-	</div>
-    -->
         <footer>
             <ul class="social-media">
                 <li>
                     <a href="https://github.com/suitzero">
-			    <i class="svg-icon github"/> GitHub
-		    </a>
-		</li>
+                        <i class="svg-icon github"></i> GitHub
+                    </a>
+                </li>
                 <li>
                     <a href="https://www.linkedin.com/in/hagyoon-choi-446a9027/">
-			    <i class="svg-icon linkedin"/> LinkedIn
+                        <i class="svg-icon linkedin"></i> LinkedIn
                     </a>
                 </li>
                 <li>
-                    <a href="mailto:suitzero@hotmail.com">
-			    <i class="svg-icon email"/> Email
-                    </a>
-                </li>
-                <!--
-                <li>
-                    <a href="https://www.shadertoy.com/user/suitzero">
-			    <img src="img/shadertoy.png" alt="shadertoy">
-                    </a>
-                </li>
-                <li>
-                    <a href="https://twitter.com/evildisease">
-			    <i class="svg-icon twitter"/></i>
+                    <a href="https://x.com/evildisease">
+                        <i class="svg-icon twitter"></i> X
                     </a>
                 </li>
                 <li>
                     <a href="https://www.youtube.com/channel/UCijpH8rZk_99AHWqCHM-dHw">
-			    <i class="svg-icon youtube"/></i>
+                        <i class="svg-icon youtube"></i> YouTube
                     </a>
                 </li>
-                -->
+                <li>
+                    <a href="mailto:suitzero@hotmail.com">
+                        <i class="svg-icon email"></i> Email
+                    </a>
+                </li>
             </ul>
         </footer>
     </body>
